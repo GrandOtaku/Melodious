@@ -1,0 +1,8 @@
+Flask
+requests
+openai
+langchain
+faiss-cpu
+tiktoken
+gunicorn
+python-dotenv
