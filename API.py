@@ -193,6 +193,7 @@ def filter_response_for_music_theme(response):
         "chorale",
         "bande originale",
         "score",
+        "histoire",
         "soundtrack",
         "licence musicale",
         "droits d'auteur musicaux",
@@ -257,6 +258,7 @@ def nettoyer_texte(texte):
 
     return texte_sans_liens
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.json  # Récupère les données JSON envoyées par l'utilisateur
@@ -290,39 +292,43 @@ def chat():
     genre_detected = detect_genre_in_query(
         query
     )  # Détecte un genre musical dans la requête de l'utilisateur
-
-    if (
-        filter_response_for_music_theme(result["answer"]) or genre_detected
-    ):  # Filtre la réponse pour s'assurer qu'elle est liée au thème musical
-        response_text = result["answer"]  # Utilise la réponse générée
+    # Vérifie si la réponse inclut des mots-clés musicaux ou si un genre a été détecté
+    if filter_response_for_music_theme(result["answer"]) or genre_detected:
+        # Prépare la structure de réponse incluant la réponse et une liste de playlists
+        response = {"answer": result["answer"], "playlists": []}
         if genre_detected:  # Si un genre musical est détecté
             try:
+                # Obtient un token d'accès Spotify à l'aide des identifiants client
                 access_token = get_spotify_token(
                     spotify_client_id, spotify_client_secret
-                )  # Obtient un token d'accès Spotify
+                )
+                # Recherche des playlists Spotify correspondant au genre détecté
                 playlists = find_spotify_playlists_by_genre(
                     access_token, genre_detected
-                )  # Trouve des playlists Spotify correspondant au genre détecté
-                if playlists:  # Ajoute les playlists trouvées à la réponse
-                    response_text += (
-                        ". Voici quelques playlists qui pourraient vous intéresser :"
-                    )
+                )
+                if playlists:  # Si des playlists sont trouvées
+                    playlist_texts = (
+                        []
+                    )  # Initialise une liste pour stocker les textes des playlists
                     for playlist in playlists:
-                        response_text += f" {playlist['name']}: {playlist['url']}"
-            except (
-                Exception
-            ) as e:  # Gère les exceptions lors de la recherche de playlists Spotify
+                        # Ajoute le nom et l'URL de chaque playlist trouvée à la liste
+                        playlist_texts.append(f"{playlist['name']}: {playlist['url']}")
+                    response[
+                        "playlists"
+                    ] = playlists  # Met à jour la réponse avec les playlists trouvées
+            except Exception as e:
+                # Gère les exceptions et imprime l'erreur si la recherche de playlists échoue
                 print(f"Erreur lors de la recherche de playlists Spotify: {e}")
-        response_text = nettoyer_texte(response_text)
-        return jsonify(
-            {"answer": response_text}
-        )  # Retourne la réponse enrichie avec les playlists Spotify
+        # Nettoie le texte de la réponse avant de le retourner
+        response["answer"] = nettoyer_texte(response["answer"])
+        return jsonify(response)  # Retourne la réponse au format JSON
     else:
+        # Retourne une réponse indiquant que la requête n'est pas suffisamment liée à la musique
         return jsonify(
             {
                 "answer": "La réponse n'est pas suffisamment liée au thème musical. Veuillez essayer avec une question différente."
             }
-        )  # Retourne une réponse indiquant l'absence de lien avec le thème musical
+        )
 
 
 # Point d'entrée principal pour exécuter l'application Flask en mode debug
